@@ -53,6 +53,18 @@ export const updateTodo = mutation({
   },
 });
 
+export const setDeadline = mutation({
+  args: { id: v.id("todos"), deadline: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const todo = await ctx.db.get(args.id);
+    if (!todo) throw new ConvexError("Todo not found");
+
+    await ctx.db.patch(args.id, {
+      deadline: args.deadline,
+    });
+  },
+});
+
 export const clearAllTodos = mutation({
   handler: async (ctx) => {
     const todos = await ctx.db.query("todos").collect();

@@ -1,4 +1,5 @@
 import { createHomeStyles } from "@/assets/styles/home.styles";
+import DeadlinePicker from "@/components/DeadlinePicker";
 import EmptyState from "@/components/EmptyState";
 import Header from "@/components/Header";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -9,7 +10,7 @@ import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "convex/react";
 import { LinearGradient } from "expo-linear-gradient";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -28,44 +29,53 @@ export default function Index() {
 
   const [editingId, setEditingId] = useState<Id<"todos"> | null>(null);
   const [editText, setEditText] = useState("");
+  const [deadlinePickerId, setDeadlinePickerId] = useState<Id<"todos"> | null>(
+    null,
+  );
 
-  const homeStyles = createHomeStyles(colors);
+  const homeStyles = useMemo(() => createHomeStyles(colors), [colors]);
 
   const todos = useQuery(api.todos.getTodos);
   const toggleTodo = useMutation(api.todos.toggleTodo);
   const deleteTodo = useMutation(api.todos.deleteTodo);
   const updateTodo = useMutation(api.todos.updateTodo);
 
-  const isLoading = todos === undefined;
+  const handleToggleTodo = useCallback(
+    async (id: Id<"todos">) => {
+      try {
+        await toggleTodo({ id });
+      } catch (error) {
+        console.log("Error toggling todo", error);
+        Alert.alert("Error", "Failed to toggle todo");
+      }
+    },
+    [toggleTodo],
+  );
 
-  if (isLoading) return <LoadingSpinner />;
+  const handleDeleteTodo = useCallback(
+    async (id: Id<"todos">) => {
+      Alert.alert(
+        "Delete Todo",
+        "Are you sure you want to delete this todo?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => deleteTodo({ id }),
+          },
+        ],
+      );
+    },
+    [deleteTodo],
+  );
 
-  const handleToggleTodo = async (id: Id<"todos">) => {
-    try {
-      await toggleTodo({ id });
-    } catch (error) {
-      console.log("Error toggling todo", error);
-      Alert.alert("Error", "Failed to toggle todo");
-    }
-  };
-
-  const handleDeleteTodo = async (id: Id<"todos">) => {
-    Alert.alert("Delete Todo", "Are you sure you want to delete this todo?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => deleteTodo({ id }),
-      },
-    ]);
-  };
-
-  const handleEditTodo = (todo: Todo) => {
+  const handleEditTodo = useCallback((todo: Todo) => {
     setEditText(todo.text);
     setEditingId(todo._id);
-  };
+  }, []);
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = useCallback(async () => {
     if (editingId) {
       try {
         await updateTodo({ id: editingId, text: editText.trim() });
@@ -76,15 +86,31 @@ export default function Index() {
         Alert.alert("Error", "Failed to update todo");
       }
     }
-  };
+  }, [editingId, editText, updateTodo]);
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     setEditingId(null);
     setEditText("");
-  };
+  }, []);
 
-  const renderTodoItem = ({ item }: { item: Todo }) => {
+  const deadlineColourIndicator = useCallback(
+    (deadline: number | undefined) => {
+      if (deadline) {
+        if (deadline < Date.now()) {
+          return colors.danger;
+        } else {
+          return colors.success;
+        }
+      } else {
+        return colors.textMuted;
+      }
+    },
+    [colors],
+  );
+
+  const renderTodoItem = useCallback(({ item }: { item: Todo }) => {
     const isEditing = editingId === item._id;
+
     return (
       <View style={homeStyles.todoItemWrapper}>
         <LinearGradient
@@ -167,29 +193,65 @@ export default function Index() {
               >
                 {item.text}
               </Text>
+              {item.deadline && (
+                <View style={homeStyles.deadlineRow}>
+                  <Ionicons
+                    name="time-outline"
+                    size={12}
+                    color={deadlineColourIndicator(item.deadline)}
+                  />
+                  <Text
+                    style={
+                      item.deadline < Date.now()
+                        ? homeStyles.deadlineTextOverdue
+                        : homeStyles.deadlineText
+                    }
+                  >
+                    {new Date(item.deadline).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                </View>
+              )}
 
-              <View style={homeStyles.todoActions}>
+              <View style={homeStyles.todoActionsWrapper}>
+                <View style={homeStyles.todoActions}>
+                  <TouchableOpacity
+                    onPress={() => handleEditTodo(item)}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={colors.gradients.warning}
+                      style={homeStyles.actionButton}
+                    >
+                      <Ionicons name="pencil" size={14} color="#fff" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteTodo(item._id)}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={colors.gradients.danger}
+                      style={homeStyles.actionButton}
+                    >
+                      <Ionicons name="trash" size={14} color="#fff" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
                 <TouchableOpacity
-                  onPress={() => handleEditTodo(item)}
+                  onPress={() => setDeadlinePickerId(item._id)}
                   activeOpacity={0.8}
                 >
-                  <LinearGradient
-                    colors={colors.gradients.warning}
-                    style={homeStyles.actionButton}
-                  >
-                    <Ionicons name="pencil" size={14} color="#fff" />
-                  </LinearGradient>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleDeleteTodo(item._id)}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={colors.gradients.danger}
-                    style={homeStyles.actionButton}
-                  >
-                    <Ionicons name="trash" size={14} color="#fff" />
-                  </LinearGradient>
+                  <Ionicons
+                    name="time-outline"
+                    size={36}
+                    color={deadlineColourIndicator(item.deadline)}
+                  />
                 </TouchableOpacity>
               </View>
             </View>
@@ -197,7 +259,22 @@ export default function Index() {
         </LinearGradient>
       </View>
     );
-  };
+  }, [
+    editingId,
+    editText,
+    homeStyles,
+    colors,
+    deadlineColourIndicator,
+    handleToggleTodo,
+    handleEditTodo,
+    handleSaveEdit,
+    handleCancelEdit,
+    handleDeleteTodo,
+  ]);
+
+  const isLoading = todos === undefined;
+
+  if (isLoading) return <LoadingSpinner />;
 
   return (
     <LinearGradient
@@ -205,6 +282,16 @@ export default function Index() {
       style={homeStyles.container}
     >
       <StatusBar barStyle={colors.statusBarStyle} />
+      {deadlinePickerId && (
+        <DeadlinePicker
+          todoId={deadlinePickerId}
+          todoText={todos?.find((t) => t._id === deadlinePickerId)?.text ?? ""}
+          currentDeadline={
+            todos?.find((t) => t._id === deadlinePickerId)?.deadline
+          }
+          onClose={() => setDeadlinePickerId(null)}
+        />
+      )}
       <SafeAreaView style={homeStyles.safeArea}>
         <Header />
 
@@ -214,6 +301,7 @@ export default function Index() {
           data={todos}
           renderItem={renderTodoItem}
           keyExtractor={(item) => item._id}
+          extraData={editingId}
           style={homeStyles.todoList}
           contentContainerStyle={homeStyles.todoListContent}
           ListEmptyComponent={<EmptyState />}

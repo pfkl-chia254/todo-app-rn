@@ -164,9 +164,16 @@ export const createHomeStyles = (colors: ColorScheme) => {
       marginBottom: 16,
       color: colors.text,
     },
+    todoActionsWrapper: {
+      flexDirection: "row",
+      gap: 12,
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
     todoActions: {
       flexDirection: "row",
       gap: 12,
+      alignItems: "center",
     },
     actionButton: {
       width: 40,
@@ -206,6 +213,23 @@ export const createHomeStyles = (colors: ColorScheme) => {
       color: "#ffffff",
       fontSize: 14,
       fontWeight: "600",
+    },
+    deadlineRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      marginTop: 4,
+      marginBottom: 8,
+    },
+    deadlineText: {
+      fontSize: 12,
+      fontWeight: "500",
+      color: colors.success,
+    },
+    deadlineTextOverdue: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.danger,
     },
     emptyContainer: {
       alignItems: "center",
